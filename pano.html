@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pano Rapor</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pano Rapor">
+    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Lightning_bolt_icon.svg/512px-Lightning_bolt_icon.svg.png">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: transparent;
+           
+
+            color: #333; 
+            margin: 0; 
+            padding: 40px 15px 100px 15px; 
+        }
+        
+        .header-section { text-align: center; margin-bottom: 20px; background: rgb(223, 223, 223); padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { font-size: 1.5rem; margin: 0 0 5px 0; color: #2c3e50; }
+        .date-text { font-size: 0.9rem; color: #7f8c8d; margin-bottom: 15px; font-weight: 500; }
+        
+        .filename-input { 
+            width: 100%; 
+            box-sizing: border-box; 
+            padding: 10px; 
+            border: 2px solid #2f7d4f; 
+            border-radius: 6px; 
+            font-size: 16px; 
+            font-weight: bold;
+            text-align: center;
+            color: #2980b9;
+        }
+        .filename-input:focus { border-color: #3498db; outline: none; }
+        
+        .facility-info-section { background: white; border: 1px solid #cecaca; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .facility-info-section h3 { margin: 0 0 15px 0; font-size: 1.2rem; color: #2f7d4f; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        
+        .facility-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        .facility-table td { border: 1px solid #ccc; padding: 8px; vertical-align: middle; }
+        .facility-table .label-cell { background-color: #ecf0f1; font-weight: 600; width: 50%; color: #2c3e50; font-size: 0.85rem; }
+        .facility-table input { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 1rem; }
+        .facility-table input:focus { border-color: #3498db; outline: none; }
+
+        .panel-container { background: white; border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        .panel-header input { font-weight: bold; padding: 8px; font-size: 1rem; flex-grow: 1; min-width: 150px; border: 1px solid #ccc; border-radius: 4px; background-color: #fcfcfc;}
+        
+        .table-responsive { overflow-x: auto; }
+        .panel-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 0.9rem; min-width: 450px; }
+        .panel-table th, .panel-table td { border: 1px solid #999; padding: 8px; text-align: left; vertical-align: middle; }
+        .panel-table th { background-color: #f0f0f0; color: #1e3a8a; }
+        
+        .panel-table td input[type="text"], .panel-table td input[type="number"], .panel-table td select { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        
+        button { cursor: pointer; padding: 8px 10px; border-radius: 6px; border: none; font-weight: bold; font-size: 0.9rem; }
+        .btn-add-panel { background-color: green; color: white; margin-bottom: 15px; width: 100%; font-size: 1.1rem; padding: 12px; }
+        .btn-add-row { background-color: green; color: white; margin-bottom: 10px; }
+        
+        .action-buttons { display: flex; gap: 5px; justify-content: center; }
+        .btn-delete { background-color: #e74c3c; color: white; width: 100%; }
+        
+        .notes-section { background: white; border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .notes-section h3 { margin: 0 0 10px 0; font-size: 1.2rem; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; font-family: inherit; min-height: 80px; resize: vertical; }
+        textarea:focus { border-color: #3498db; outline: none; }
+        
+        .btn-excel { background-color: #ae2727; color: white; position: fixed; bottom: 20px; left: 20px; right: 20px; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); font-size: 1.1rem; text-align: center; border-radius: 12px; z-index: 1000; }
+    </style>
+</head>
+<body>
+
+    <div class="header-section">
+        <img src="./rear.png" alt="Logo" style="width: 90px; height: auto; display: block; margin: 0 auto 10px; transform: scale(1.5);">
+        
+        <h1 style="color: rgb(1, 19, 1); font-size: 2.5rem; text-align: center;">
+            REAR MÜHENDİSLİK
+        </h1>
+        <h3>Elektrik Ölçüm Raporu</h3>
+        <div id="current-date" class="date-text">Tarih Yükleniyor...</div>
+        <input type="text" id="custom-filename" class="filename-input" placeholder="İşletme Adı Girin">
+    </div>
+
+    <div class="facility-info-section">
+        <h3>Tesis Bilgileri</h3>
+        <div class="table-responsive">
+            <table class="facility-table">
+                <tbody>
+                    <tr><td class="label-cell">ENERJİ SAĞLAYAN KURULUŞ</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">ŞEBEKE TİPİ</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">ŞEBEKE GERİLİMİ</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">TESİSE AİT PROJE VAR MI</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">TEK HAT ŞEMASI VAR MI</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">KONTROL TALEBİ</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">EKİPMANIN KULLANIM AMACI</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">SON KONTROL TARİHİ</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">FAZ İLETKENLERİNİN SAYISI</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">PARAFUDR BULUNMAKTA MIDIR</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">TESİSATTA AŞIRI GERİLİM KORUMA CİHAZI VAR MI</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">PARATONERİN YERİ</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">YAPI KULLANMA İZİN TARİHİ</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">BİNA TOPLAM KULLANIM ALANI</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">KAT SAYISI</td><td><input type="text"></td></tr>
+                    <tr><td class="label-cell">BİNA YÜKSEKLİĞİ</td><td><input type="text"></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <button class="btn-add-panel" onclick="addPanel()">+ Yeni Pano Ekle</button>
+    
+    <div id="panels-wrapper">
+    </div>
+
+    <div class="notes-section">
+        <h3>Notlar</h3>
+        <textarea id="report-notes" placeholder="Raporla ilgili eklemek istediğiniz notları yazınız..."></textarea>
+    </div>
+
+    <button class="btn-excel" onclick="exportToExcel()">Excel'e Aktar (İndir)</button>
+
+    <script>
+        function setTodayDate() {
+            const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            const today = new Date().toLocaleDateString('tr-TR', dateOptions);
+            document.getElementById('current-date').innerText = today;
+        }
+
+        let panelCount = 0;
+
+        function addPanel() {
+            panelCount++;
+            const wrapper = document.getElementById('panels-wrapper');
+            const panelId = 'panel-' + Date.now();
+            
+            const panelHTML = `
+                <div class="panel-container" id="${panelId}">
+                    <div class="panel-header">
+                        <input type="text" value="Pano ${panelCount}" class="p-name" placeholder="Pano Adı">
+                        <button class="btn-delete" onclick="document.getElementById('${panelId}').remove()" style="width: auto;">Panoyu Sil</button>
+                    </div>
+                    <button class="btn-add-row" onclick="addRow('${panelId}')">+ Satır Ekle</button>
+                    <div class="table-responsive">
+                        <table class="panel-table">
+                            <thead>
+                                <tr>
+                                    <th>Linye Adı</th>
+                                    <th>Koruma Tipi</th>
+                                    <th>Güç (kW)</th>
+                                    <th>Kesme Akımı (kA)</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody class="row-container">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+            wrapper.insertAdjacentHTML('beforeend', panelHTML);
+            addRow(panelId);
+        }
+
+        function addRow(panelId) {
+            const tbody = document.querySelector(`#${panelId} .row-container`);
+            const rowHTML = `
+                <tr>
+                    <td><input type="text" class="l-name" placeholder="Linye"></td>
+                    <td>
+                        <select class="l-type">
+                            <option>K.A.K.R</option>
+                            <option>T.M.Ş.</option>
+                            <option>A</option>
+                            <option>B</option>
+                            <option>C</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.1" class="l-power" placeholder="0"></td>
+                    <td><input type="number" step="0.1" class="l-break" placeholder="0"></td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-delete" onclick="this.parentElement.parentElement.parentElement.remove()">X</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', rowHTML);
+        }
+
+        function exportToExcel() {
+            let wb = XLSX.utils.book_new();
+            let ws_data = [];
+            let merges = [];
+            let rowIndex = 0; 
+
+            let isletmeAdi = document.getElementById('custom-filename').value.trim() || "Elektrik Ölçüm Raporu";
+            let raporBasligi = "RAPOR: " + isletmeAdi.toUpperCase();
+
+            
+            ws_data.push([raporBasligi, "", "", "", ""]);
+            merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } }); 
+            rowIndex++;
+            
+            ws_data.push(["", "", "", "", ""]); 
+            rowIndex++;
+
+            
+            ws_data.push(["TESİS BİLGİLERİ", "", "", "", ""]);
+            merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } });
+            rowIndex++;
+
+            ws_data.push(["Özellik", "", "Değer", "", ""]);
+            merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 1 } }); 
+            merges.push({ s: { r: rowIndex, c: 2 }, e: { r: rowIndex, c: 4 } }); 
+            rowIndex++;
+            
+            const infoRows = document.querySelectorAll('.facility-table tbody tr');
+            infoRows.forEach(row => {
+                const label = row.cells[0].innerText;
+                const value = row.cells[1].querySelector('input').value.trim();
+                
+                ws_data.push([label, "", value, "", ""]);
+                merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 1 } });
+                merges.push({ s: { r: rowIndex, c: 2 }, e: { r: rowIndex, c: 4 } });
+                rowIndex++;
+            });
+
+            ws_data.push(["", "", "", "", ""]); 
+            rowIndex++;
+
+            
+            ws_data.push(["PANO BİLGİLERİ", "", "", "", ""]);
+            merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } });
+            rowIndex++;
+
+            ws_data.push(["Pano Adı", "Linye Adı", "Koruma Tipi", "Gücü (kW)", "Kesme Akımı (kA)"]);
+            rowIndex++;
+            
+            const panels = document.querySelectorAll('.panel-container');
+            panels.forEach(panel => {
+                const panoName = panel.querySelector('.p-name').value || "İsimsiz Pano";
+                const rows = panel.querySelectorAll('.row-container tr');
+                
+                rows.forEach(row => {
+                    const lName = row.querySelector('.l-name').value;
+                    const lType = row.querySelector('.l-type').value;
+                    const lPower = row.querySelector('.l-power').value;
+                    const lBreak = row.querySelector('.l-break').value;
+                    
+                    ws_data.push([panoName, lName, lType, lPower, lBreak]);
+                    rowIndex++;
+                });
+            });
+
+            ws_data.push(["", "", "", "", ""]); 
+            rowIndex++;
+
+            
+            ws_data.push(["EK NOTLAR", "", "", "", ""]);
+            merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } });
+            rowIndex++;
+            
+            const notes = document.getElementById('report-notes').value.trim();
+            ws_data.push([notes !== "" ? notes : "Herhangi bir not eklenmedi.", "", "", "", ""]);
+            merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } });
+            rowIndex++;
+
+            
+            let ws = XLSX.utils.aoa_to_sheet(ws_data);
+            
+            
+            ws['!merges'] = merges;
+
+            
+            ws['!cols'] = [
+                {wch: 25}, // A Sütunu
+                {wch: 25}, // B Sütunu
+                {wch: 15}, // C Sütunu
+                {wch: 15}, // D Sütunu
+                {wch: 18}  // E Sütunu
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, "Ölçüm Raporu");
+
+            
+            let customName = isletmeAdi.replace(/ /g, "_").replace(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ_]/g, "");
+            const dateStr = new Date().toISOString().split('T')[0]; 
+            const finalFileName = `${customName}_${dateStr}.xlsx`; 
+
+            XLSX.writeFile(wb, finalFileName);
+        }
+
+        setTodayDate();
+        addPanel();
+    </script>
+</body>
+</html>
