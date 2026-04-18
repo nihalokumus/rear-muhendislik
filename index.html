@@ -12,6 +12,7 @@
     <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Lightning_bolt_icon.svg/512px-Lightning_bolt_icon.svg.png">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
     <style>
         body { 
@@ -52,8 +53,16 @@
         .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         .panel-header input { font-weight: bold; padding: 8px; font-size: 1rem; flex-grow: 1; min-width: 150px; border: 1px solid #ccc; border-radius: 4px; background-color: #fcfcfc;}
         
+        /* Resim Ekleme Alanı Stilleri */
+        .panel-image-section { background-color: #f9f9f9; padding: 10px; border-radius: 6px; border: 1px dashed #aaa; text-align: center; margin-bottom: 15px; }
+        .btn-add-image { background-color: #3498db; color: white; padding: 8px 15px; border-radius: 6px; cursor: pointer; display: inline-block; font-size: 0.9rem; font-weight: bold; transition: background 0.3s; }
+        .btn-add-image:hover { background-color: #2980b9; }
+        .image-preview-container { margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .image-preview-container img { max-width: 100%; max-height: 250px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); object-fit: contain; }
+        .btn-remove-image { background-color: #e67e22; color: white; padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; }
+
         .table-responsive { overflow-x: auto; }
-        .panel-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 0.9rem; min-width: 450px; }
+        .panel-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 0.9rem; min-width: 500px; }
         .panel-table th, .panel-table td { border: 1px solid #999; padding: 8px; text-align: left; vertical-align: middle; }
         .panel-table th { background-color: #f0f0f0; color: #1e3a8a; }
         
@@ -64,7 +73,9 @@
         .btn-add-row { background-color: green; color: white; margin-bottom: 10px; }
         
         .action-buttons { display: flex; gap: 5px; justify-content: center; }
-        .btn-delete { background-color: #e74c3c; color: white; width: 100%; }
+        .btn-delete { background-color: #e74c3c; color: white; }
+        .btn-move { background-color: #7f8c8d; color: white; padding: 8px; display: flex; align-items: center; justify-content: center; }
+        .btn-move:hover { background-color: #34495e; }
         
         .notes-section { background: white; border: 1px solid #ccc; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .notes-section h3 { margin: 0 0 10px 0; font-size: 1.2rem; color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 5px; }
@@ -146,7 +157,7 @@
         <textarea id="report-notes" placeholder="Raporla ilgili eklemek istediğiniz notları yazınız..."></textarea>
     </div>
 
-    <button class="btn-excel" onclick="exportToExcel()">Excel'e Aktar (İndir)</button>
+    <button class="btn-excel" onclick="exportData()">Raporu ve Fotoğrafları İndir (ZIP)</button>
 
     <div id="custom-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
@@ -159,32 +170,90 @@
     </div>
 
     <script>
-        // --- Modal Mantığı Başlangıcı ---
-        let pendingAction = null; // Silme işlemini geçici olarak hafızada tutar
+        // --- Modal Mantığı ---
+        let pendingAction = null; 
 
         function showConfirmModal(message, actionCallback) {
             document.getElementById('modal-message').innerText = message;
-            document.getElementById('custom-modal').style.display = 'flex'; // Modalı göster
+            document.getElementById('custom-modal').style.display = 'flex'; 
             pendingAction = actionCallback;
         }
 
         function closeModal() {
-            document.getElementById('custom-modal').style.display = 'none'; // Modalı gizle
+            document.getElementById('custom-modal').style.display = 'none'; 
             pendingAction = null;
         }
 
         function confirmAction() {
             if (pendingAction) {
-                pendingAction(); // Hafızadaki silme işlemini gerçekleştir
+                pendingAction(); 
             }
             closeModal();
         }
-        // --- Modal Mantığı Sonu ---
 
+        // --- Tarih ---
         function setTodayDate() {
             const dateOptions = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
             const today = new Date().toLocaleDateString('tr-TR', dateOptions);
             document.getElementById('current-date').innerText = today;
+        }
+
+        // --- Fotoğraf Önizleme, Sıkıştırma ve Silme İşlemleri ---
+        function previewImage(input, previewId) {
+            const preview = document.getElementById(previewId);
+            const removeBtn = document.getElementById('remove-img-' + previewId.split('-')[1]);
+            
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        // Kasmayı önlemek için resmi Canvas ile sıkıştırıyoruz (Maks genişlik 1024px)
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 1024;
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        if (width > MAX_WIDTH) {
+                            height = Math.round((height * MAX_WIDTH) / width);
+                            width = MAX_WIDTH;
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Sıkıştırılmış veriyi JPEG olarak al (Kalite %80)
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                        
+                        preview.src = compressedDataUrl;
+                        preview.style.display = 'block';
+                        removeBtn.style.display = 'inline-block';
+                    }
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function removeImage(panelId) {
+            document.getElementById('img-' + panelId).value = '';
+            document.getElementById('preview-' + panelId).style.display = 'none';
+            document.getElementById('preview-' + panelId).src = '';
+            document.getElementById('remove-img-' + panelId).style.display = 'none';
+        }
+
+        // --- Satır Yukarı/Aşağı Taşıma ---
+        function moveRow(button, direction) {
+            const row = button.closest('tr');
+            const tbody = row.parentElement;
+            
+            if (direction === -1 && row.previousElementSibling) {
+                tbody.insertBefore(row, row.previousElementSibling);
+            } else if (direction === 1 && row.nextElementSibling) {
+                tbody.insertBefore(row.nextElementSibling, row);
+            }
         }
 
         let panelCount = 0;
@@ -198,8 +267,18 @@
                 <div class="panel-container" id="${panelId}">
                     <div class="panel-header">
                         <input type="text" value="Pano ${panelCount}" class="p-name" placeholder="Pano Adı">
-                        <button class="btn-delete" onclick="showConfirmModal('Bu panoyu silmek istediğinize emin misiniz?', () => document.getElementById('${panelId}').remove())" style="width: auto;">Panoyu Sil</button>
+                        <button class="btn-delete" onclick="showConfirmModal('Bu panoyu silmek istediğinize emin misiniz?', () => document.getElementById('${panelId}').remove())" style="width: auto; padding: 10px;">Panoyu Sil</button>
                     </div>
+                    
+                    <div class="panel-image-section">
+                        <input type="file" id="img-${panelId}" accept="image/*" style="display: none;" onchange="previewImage(this, 'preview-${panelId}')">
+                        <label for="img-${panelId}" class="btn-add-image">📷 Pano Fotoğrafı Seç / Çek</label>
+                        <div class="image-preview-container">
+                            <img id="preview-${panelId}" style="display: none;" alt="Pano Fotoğrafı">
+                            <button class="btn-remove-image" id="remove-img-${panelId}" style="display:none;" onclick="removeImage('${panelId}')">Fotoğrafı Sil</button>
+                        </div>
+                    </div>
+
                     <button class="btn-add-row" onclick="addRow('${panelId}')">+ Satır Ekle</button>
                     <div class="table-responsive">
                         <table class="panel-table">
@@ -209,7 +288,7 @@
                                     <th>Koruma Tipi</th>
                                     <th>Güç (kW)</th>
                                     <th>Kesme Akımı (kA)</th>
-                                    <th>İşlem</th>
+                                    <th style="min-width: 100px; text-align:center;">İşlem</th>
                                 </tr>
                             </thead>
                             <tbody class="row-container">
@@ -240,7 +319,9 @@
                     <td><input type="number" step="0.1" class="l-break" placeholder="0"></td>
                     <td>
                         <div class="action-buttons">
-                            <button class="btn-delete" onclick="let row = this.closest('tr'); showConfirmModal('Bu satırı silmek istediğinize emin misiniz?', () => row.remove());">X</button>
+                            <button class="btn-move" onclick="moveRow(this, -1)" title="Yukarı Taşı">⬆</button>
+                            <button class="btn-move" onclick="moveRow(this, 1)" title="Aşağı Taşı">⬇</button>
+                            <button class="btn-delete" style="width:40px;" onclick="let row = this.closest('tr'); showConfirmModal('Bu satırı silmek istediğinize emin misiniz?', () => row.remove());">X</button>
                         </div>
                     </td>
                 </tr>
@@ -248,16 +329,16 @@
             tbody.insertAdjacentHTML('beforeend', rowHTML);
         }
 
-        function exportToExcel() {
+        // EXCEL VE FOTOĞRAFLARI ZIP OLARAK İNDİRME FONKSİYONU
+        function exportData() {
             let wb = XLSX.utils.book_new();
             let ws_data = [];
             let merges = [];
             let rowIndex = 0; 
 
-            let isletmeAdi = document.getElementById('custom-filename').value.trim() || "Elektrik Ölçüm Raporu";
+            let isletmeAdi = document.getElementById('custom-filename').value.trim() || "Elektrik_Olcum_Raporu";
             let raporBasligi = "RAPOR: " + isletmeAdi.toUpperCase();
 
-            
             ws_data.push([raporBasligi, "", "", "", ""]);
             merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } }); 
             rowIndex++;
@@ -265,7 +346,6 @@
             ws_data.push(["", "", "", "", ""]); 
             rowIndex++;
 
-            
             ws_data.push(["TESİS BİLGİLERİ", "", "", "", ""]);
             merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } });
             rowIndex++;
@@ -289,7 +369,6 @@
             ws_data.push(["", "", "", "", ""]); 
             rowIndex++;
 
-            
             ws_data.push(["PANO BİLGİLERİ", "", "", "", ""]);
             merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } });
             rowIndex++;
@@ -316,7 +395,6 @@
             ws_data.push(["", "", "", "", ""]); 
             rowIndex++;
 
-            
             ws_data.push(["EK NOTLAR", "", "", "", ""]);
             merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } });
             rowIndex++;
@@ -326,29 +404,53 @@
             merges.push({ s: { r: rowIndex, c: 0 }, e: { r: rowIndex, c: 4 } });
             rowIndex++;
 
-            
             let ws = XLSX.utils.aoa_to_sheet(ws_data);
             
-            
             ws['!merges'] = merges;
-
-            
             ws['!cols'] = [
-                {wch: 25}, // A Sütunu
-                {wch: 25}, // B Sütunu
-                {wch: 15}, // C Sütunu
-                {wch: 15}, // D Sütunu
-                {wch: 18}  // E Sütunu
+                {wch: 25}, {wch: 25}, {wch: 15}, {wch: 15}, {wch: 18} 
             ];
 
             XLSX.utils.book_append_sheet(wb, ws, "Ölçüm Raporu");
 
-            
+            // DOSYA ADI HAZIRLAMA
             let customName = isletmeAdi.replace(/ /g, "_").replace(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ_]/g, "");
             const dateStr = new Date().toISOString().split('T')[0]; 
-            const finalFileName = `${customName}_${dateStr}.xlsx`; 
+            const baseFileName = `${customName}_${dateStr}`; 
 
-            XLSX.writeFile(wb, finalFileName);
+            // 1. EXCEL'İ OLUŞTUR VE ZIP'E EKLE
+            let wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+            let zip = new JSZip();
+            zip.file(`${baseFileName}.xlsx`, wbout);
+
+            // 2. FOTOĞRAFLARI BUL VE ZIP'E EKLE
+            let imgFolder = zip.folder("Pano_Fotograflari");
+            
+            panels.forEach((panel, index) => {
+                let panoName = panel.querySelector('.p-name').value || `Pano_${index + 1}`;
+                let safePanoName = panoName.replace(/ /g, "_").replace(/[^a-zA-Z0-9çğıöşüÇĞİÖŞÜ_]/g, "");
+                
+                const imgPreview = panel.querySelector('.image-preview-container img');
+                if (imgPreview && imgPreview.style.display !== 'none' && imgPreview.src) {
+                    const base64Data = imgPreview.src.split(',')[1]; 
+                    if (base64Data) {
+                        imgFolder.file(`${safePanoName}.jpeg`, base64Data, {base64: true});
+                    }
+                }
+            });
+
+            // 3. ZIP DOSYASINI KULLANICIYA İNDİRT
+            zip.generateAsync({type:"blob"}).then(function(content) {
+                const url = window.URL.createObjectURL(content);
+                const a = document.createElement("a");
+                a.style.display = "none";
+                a.href = url;
+                a.download = `${baseFileName}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            });
         }
 
         setTodayDate();
